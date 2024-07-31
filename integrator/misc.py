@@ -318,40 +318,6 @@ def _check_inputs(func, y0, t, rtol, atol, method, options,  SOLVERS):
         t = t.to(y0.device)
     # ~Backward compatibility
 
-
-
-    # Add callbacks to wrapped_func
-    callback_names = set()
-    for callback_name in _all_callback_names:
-        try:
-            callback = getattr(original_func, callback_name)
-        except AttributeError:
-            setattr(func, callback_name, _null_callback)
-        else:
-            if callback is not _null_callback:
-                callback_names.add(callback_name)
-                # At the moment all callbacks have the arguments (t0, y0, dt).
-                # These will need adjusting on a per-callback basis if that changes in the future.
-                if is_tuple:
-                    def callback(t0, y0, dt, _callback=callback):
-                        y0 = _flat_to_shape(y0, (), shapes)
-                        return _callback(t0, y0, dt)
-                if t_is_reversed:
-                    def callback(t0, y0, dt, _callback=callback):
-                        return _callback(-t0, y0, dt)
-            setattr(func, callback_name, callback)
-    for callback_name in _all_adjoint_callback_names:
-        try:
-            callback = getattr(original_func, callback_name)
-        except AttributeError:
-            pass
-        else:
-            setattr(func, callback_name, callback)
-
-    invalid_callbacks = callback_names - SOLVERS[method].valid_callbacks()
-    if len(invalid_callbacks) > 0:
-        warnings.warn("Solver '{}' does not support callbacks {}".format(method, invalid_callbacks))
-
     return shapes, func, y0, t, rtol, atol, method, options, t_is_reversed
 
 

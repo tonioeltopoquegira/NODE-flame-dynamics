@@ -33,13 +33,9 @@ def write_summary(excel_filename, model_name, data_details, train_details, train
 
     print(f"Summary has been written to {excel_filename}!")
 
-def set_up_folders(model_name, a):
-    a = tuple(a)
-    fname = folder_names[a]
-    path = os.path.join(model_name, fname)
+def set_up_folders(model_name, integrator):
+    path = os.path.join(model_name, integrator)
     directory_path = os.path.join("figures", path)
-    os.makedirs(directory_path, exist_ok=True)
-    directory_path = os.path.join(directory_path, "activations")
     os.makedirs(directory_path, exist_ok=True)
     directory_path = os.path.join("weights",path)
     os.makedirs(directory_path, exist_ok=True)

@@ -13,7 +13,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def train_model(dataset, model, epochs, path, batch_size = 3, scheduler = False, learning_rate = 1e-5, print_every=1):
     
     # PyTorch Dataset and DataLoader
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True) # batch size > 200
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False) # batch size > 200
 
     # optimizer & scheduler
     
@@ -57,9 +57,11 @@ def train_model(dataset, model, epochs, path, batch_size = 3, scheduler = False,
             inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
             optimizer.zero_grad()
             
-
             # Forward pass
             pred = model(inputs, iv)
+
+            if i == 0:
+                train_plot_pred(inputs, targets, pred, path, epoch)
 
             loss = criterion(pred, targets)
 
@@ -145,4 +147,21 @@ def summary_training(name, model, input_size, epochs, scheduler, att):
 
     return run_entry
 
-    
+def train_plot_pred(inputs, targets, pred, path, epoch):
+    targets = targets.squeeze(0).squeeze(0).squeeze(-1)
+    pred = pred.squeeze(0).squeeze(0).squeeze(-1).squeeze(-1)
+
+    times = inputs[:,1,:,0].squeeze(0).detach().cpu().numpy()
+    targets = targets.detach().cpu().numpy()
+    pred = pred.detach().cpu().numpy()
+
+    print(times.shape)
+    print(targets.shape)
+    print(pred.shape)
+
+    plt.plot(times, targets, label='Ground Truth', linestyle='--', color='k')
+    plt.plot(times, pred, label='Prediction', linestyle='-', color='r')
+    plt.title(f"Prediction at epoch {epoch+1}")
+    plt.legend()
+    plt.savefig(f"figures/{path}/training_epoch_{epoch+1}.png")
+    plt.close()

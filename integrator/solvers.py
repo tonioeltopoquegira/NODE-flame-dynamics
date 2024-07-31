@@ -18,26 +18,8 @@ class FixedGridODESolver(metaclass=abc.ABCMeta):
         self.dtype = y0.dtype
         self.device = y0.device
         self.step_size = step_size
-        self.interp = interp
-        #self.grid_constructor = self._grid_constructor_from_step_size(step_size) # NON SENSE HERE
-            
+        self.interp = interp    
 
-    @classmethod
-    def valid_callbacks(cls):   
-        return {'callback_step'}
-
-    @staticmethod
-    def _grid_constructor_from_step_size(step_size): # SOME GOOD NON SENSE HERE
-        def _grid_constructor(func, y0, t):
-            start_time = t[0]
-            end_time = t[-1]
-
-            niters = torch.ceil((end_time - start_time) / step_size + 1).item()
-            t_infer = torch.arange(0, niters, dtype=t.dtype, device=t.device) * step_size + start_time
-            t_infer[-1] = t[-1]
-
-            return t_infer
-        return _grid_constructor
 
     @abc.abstractmethod
     def _step_func(self, func, t0, dt, t1, y0):
@@ -45,7 +27,6 @@ class FixedGridODESolver(metaclass=abc.ABCMeta):
 
     def integrate(self, t, x):
         time_grid = t
-        x_grid = x
 
         solution = torch.empty(len(t), *self.y0.shape, dtype=self.y0.dtype, device=self.y0.device)
         solution[0] = self.y0
@@ -54,8 +35,7 @@ class FixedGridODESolver(metaclass=abc.ABCMeta):
         y0 = self.y0
         for i, (t0, t1) in enumerate(zip(time_grid[:-1], time_grid[1:])):
             dt = t1 - t0 # could make it fancier
-            self.func.callback_step(t0, y0, dt) # BOH!
-            dy = self._step_func(self.func, t0, dt, t1, y0, x[:,i]) # take all rows and column i (only given 1 in this case)
+            dy = self._step_func(self.func, t0, dt, t1, y0, x[i, :])
             y1 = y0 + dy
             solution[i+1] = y1
             y0 = y1

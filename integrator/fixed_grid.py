@@ -7,8 +7,6 @@ class Euler(FixedGridODESolver):
     def _step_func(self, func, t0, dt, t1, y0, x):
         
         f0 = func(t0, y0, x)
-        
-        out = dt*f0
     
         return dt * f0
     
