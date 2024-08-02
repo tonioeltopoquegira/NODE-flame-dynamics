@@ -1,5 +1,6 @@
 # Imports 
 import time
+from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -40,6 +41,10 @@ def train_model(dataset, model, epochs, path, batch_size = 3, scheduler = False,
     # Summaries, Parameters, Model Complexity
     #run_entry = summary_training(name, model, input_size, epochs, scheduler, att)
 
+    """print(f"Initial Weights:")
+    for name, param in model.named_parameters():
+        print(f"{name}: {param.data}")
+"""
     print("Training...")
 
     loss_train = np.zeros(epochs)
@@ -53,13 +58,13 @@ def train_model(dataset, model, epochs, path, batch_size = 3, scheduler = False,
         epoch_start_time = time.time()
 
         #for i, (inputs, targets, iv) in enumerate(data_loader):
-        for i, (inputs, targets, iv) in enumerate(data_loader):
+        for i, (inputs, targets, iv) in enumerate(tqdm(data_loader, desc=f"Epoch {epoch+1}/{epochs}", unit="batch")):
             inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
             optimizer.zero_grad()
             
             # Forward pass
+            
             pred = model(inputs, iv)
-
             if i == 0:
                 train_plot_pred(inputs, targets, pred, path, epoch)
 
@@ -82,8 +87,14 @@ def train_model(dataset, model, epochs, path, batch_size = 3, scheduler = False,
         if (epoch+1) % print_every == 0:
             print(f"Epoch {epoch+1}, Epoch Total MSE: {(epoch_loss):.3f}, Epoch Time: {epoch_time:.2f}s")
         
+        if (epoch+1) % 20 == 0:
+            torch.save(model.state_dict(), f'weights/{path}/weights.pth')
+        
         loss_train[epoch] = epoch_loss
 
+        """print(f"Epoch {epoch + 1} Weights:")
+        for name, param in model.named_parameters():
+            print(f"{name}: {param.data}")"""
     # Save model weights
     torch.save(model.state_dict(), f'weights/{path}/weights.pth')
     plt.plot(np.arange(epochs), loss_train)
@@ -154,10 +165,6 @@ def train_plot_pred(inputs, targets, pred, path, epoch):
     times = inputs[:,1,:,0].squeeze(0).detach().cpu().numpy()
     targets = targets.detach().cpu().numpy()
     pred = pred.detach().cpu().numpy()
-
-    print(times.shape)
-    print(targets.shape)
-    print(pred.shape)
 
     plt.plot(times, targets, label='Ground Truth', linestyle='--', color='k')
     plt.plot(times, pred, label='Prediction', linestyle='-', color='r')

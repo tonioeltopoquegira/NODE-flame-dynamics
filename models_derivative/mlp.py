@@ -5,16 +5,27 @@ import torch.nn.init as init
 
 
 class mlp(nn.Module):
-    def __init__(self):
+    def __init__(self, input):
         super(mlp, self).__init__()
-        self.seq = nn.Sequential(
-            nn.Linear(3, 10),
-            nn.ReLU(),
-            nn.Linear(10, 10),
-            nn.ReLU(),
-            nn.Linear(10, 1),
-            nn.Tanh()
-        )
+        self.fc1 = nn.Linear(input, 10)
+        self.fc2 = nn.Linear(10, 1)
+        """self.fc_y1 = nn.Linear(1, 3)
+        self.fc_y2 = nn.Linear(3, 1)"""
+        self.init_weights()
+    
+    def init_weights(self):
+        nn.init.xavier_uniform_(self.fc1.weight)
+        nn.init.xavier_uniform_(self.fc2.weight)
+        #nn.init.zeros_(self.fc1.weight)
+        #nn.init.zeros_(self.fc2.weight)
+        nn.init.zeros_(self.fc1.bias)
+        nn.init.zeros_(self.fc2.bias)
+        """nn.init.zeros_(self.fc_y1.weight)
+        nn.init.zeros_(self.fc_y2.weight)
+        nn.init.zeros_(self.fc_y1.bias)
+        nn.init.zeros_(self.fc_y2.bias)"""
+
+
         
     def forward(self, t0, y0, u):
         """
@@ -26,15 +37,8 @@ class mlp(nn.Module):
             dqdt: derivative at that point
         """
 
+        x = F.relu(self.fc1(u))
+        x = F.tanh(self.fc2(x))
+        return x
+
         
-
-        t0 = t0.unsqueeze(0)  
-        y0 = y0.reshape(1)
-
-        
-
-        ins = torch.cat([t0, y0, u], dim=0)
-
-        out = self.seq(ins)
-
-        return out

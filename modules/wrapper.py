@@ -20,13 +20,16 @@ class NeuralODE(nn.Module):
     def forward(self, x, iv):
 
         # Get Times to evaluate
-        eval_times = x[:, 1, :].squeeze(1).squeeze(0)
+        eval_times = x[:, 1, :, 0].squeeze(1).squeeze(0)
+
+        
 
         # Get Initial value for Q
-        initial_value = iv.squeeze()
-       
+        initial_value = iv
+
+        
         # Velocity perturbations
-        u_values = x[:, 0, :].squeeze(1)
+        u_values = x[:, 0, :, :].squeeze(1).squeeze(0)
 
         # Gradients?
         u_values.requires_grad_(True)
@@ -35,7 +38,7 @@ class NeuralODE(nn.Module):
 
         out = odeint(self.f_prime_model, y0=initial_value, t=eval_times, x=u_values, method=self.integrator, shapes = self.shapes)
 
-        out = out.unsqueeze(0).unsqueeze(0)
+        out = out.permute(1, 0, 2)
         
         
         return out

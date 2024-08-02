@@ -21,6 +21,7 @@ class OdeintAdjointMethod(torch.autograd.Function):
     
         with torch.no_grad():
             y = odeint(func, y0, t, x, rtol=rtol, atol=atol, method=method, options=options)
+
             ctx.save_for_backward(t, y, x, *adjoint_params)
 
         return y
@@ -47,6 +48,7 @@ class OdeintAdjointMethod(torch.autograd.Function):
             #      Set up initial state      #
             ##################################
 
+            # CHANGED THE INITIAL STATE
             # [-1] because y and grad_y are both of shape (len(t), *y0.shape)
             aug_state = [torch.zeros((), dtype=y.dtype, device=y.device), y[-1], grad_y[-1]]  # vjp_t, y, vjp_y
             aug_state.extend([torch.zeros_like(param) for param in adjoint_params])  # vjp_params
@@ -58,11 +60,16 @@ class OdeintAdjointMethod(torch.autograd.Function):
             def augmented_dynamics(t, y_aug, x): 
                 # Dynamics of the original system augmented with
                 # the adjoint wrt y, and an integrator wrt t and args.
-            
                 y = y_aug[1].unsqueeze(0)
                 adj_y = y_aug[2].unsqueeze(0)
-                   
+                
+                while y.dim() != 1:
+                    y = y.squeeze(0)
+                    adj_y = adj_y.squeeze(0)
+                
+                #print(y.shape)
                 #print(adj_y)
+    
                 # ignore gradients wrt time and parameters
 
                 with torch.enable_grad():
@@ -75,6 +82,8 @@ class OdeintAdjointMethod(torch.autograd.Function):
                     # doesn't necessarily even exist if there is piecewise structure in time), so turning off gradients
                     # wrt t here means we won't compute that if we don't need it.
                     func_eval = func(t if t_requires_grad else t_, y, x)
+
+                    #print(func_eval)
 
                     # Workaround for PyTorch bug #39784
                     _t = torch.as_strided(t, (), ())  # noqa
@@ -92,6 +101,8 @@ class OdeintAdjointMethod(torch.autograd.Function):
                 vjp_y = torch.zeros_like(y) if vjp_y is None else vjp_y
                 vjp_params = [torch.zeros_like(param) if vjp_param is None else vjp_param
                               for param, vjp_param in zip(adjoint_params, vjp_params)]
+                
+                #print(vjp_params)
 
                 return (vjp_t, func_eval, vjp_y, *vjp_params)
             
@@ -107,19 +118,19 @@ class OdeintAdjointMethod(torch.autograd.Function):
 
             
             for i in range(len(t) - 1, 0, -1):
-                if t_requires_grad:
+
+                """if t_requires_grad:
                     # Compute the effect of moving the current time measurement point.
                     # We don't compute this unless we need to, to save some computation.
-                    func_eval = func(t[i], y[i], x[:,i])
+                    func_eval = func(t[i], y[i], x[i, :])
                     dLd_cur_t = func_eval.reshape(-1).dot(grad_y[i].reshape(-1))
                     aug_state[0] -= dLd_cur_t
-                    time_vjps[i] = dLd_cur_t
+                    time_vjps[i] = dLd_cur_t"""
 
                 # Run the augmented system backwards in time.
                 t_back = t[i - 1:i + 1].flip(0)
                
-                x_back = x[:, i-1:i+1].flip(1)
-                
+                x_back = x[i-1:i+1, :].flip(0)
                 
                 aug_state = odeint(
                     func= augmented_dynamics, y0= tuple(aug_state),
@@ -127,23 +138,25 @@ class OdeintAdjointMethod(torch.autograd.Function):
                     x = x_back,
                     rtol=adjoint_rtol, atol=adjoint_atol, method=adjoint_method, options=adjoint_options
                 )
-                
                 #aug_state = [a[1] for a in aug_state]  # extract just the t[i - 1] value
                 aug_state = aug_state[1]
                 
                 aug_state[1] = y[i - 1]  # update to use our forward-pass estimate of the state
-                aug_state[2] += grad_y[i - 1]  # update any gradients wrt state at this time point
+                aug_state[2] += grad_y[i - 1].item()  # update any gradients wrt state at this time point
 
             
-            if t_requires_grad:
-                time_vjps[0] = aug_state[0]
-            adj_y = aug_state[2] 
-            adj_params = aug_state[3:] 
+        if t_requires_grad:
+            time_vjps[0] = aug_state[0]
+        adj_y = aug_state[2] 
+        adj_params = aug_state[3:] 
 
         # Issue is that my forward method takes 13 inputs (including my x) + 6 parameters (parametrizing function f(x), for a total of 161)
         # My backward is currently returning the 13 derivatives + adj_params that is a tensor containing all parameters but not ordered anymore in separate tensors
 
         adj_params = reshape_tensor(adj_params, ctx.shapes)
+
+        #print(adj_params)
+
         return (None, None, adj_y, time_vjps, None, None, None, None,  None, None, None, None, None, None, *adj_params)
 
 def odeint_adjoint(func, y0, t, x, *, rtol=1e-7, atol=1e-9, method=None, options=None, shapes=None,
@@ -178,7 +191,7 @@ def odeint_adjoint(func, y0, t, x, *, rtol=1e-7, atol=1e-9, method=None, options
         adjoint_params = tuple(find_parameters(func))
     else:
         adjoint_params = tuple(adjoint_params)  # in case adjoint_params is a generator.
-
+   
     # Filter params that don't require gradients.
     oldlen_ = len(adjoint_params)
     adjoint_params = tuple(p for p in adjoint_params if p.requires_grad)

@@ -1,4 +1,5 @@
 from .solvers import FixedGridODESolver
+import numpy as np
 
 
 class Euler(FixedGridODESolver):
@@ -8,7 +9,7 @@ class Euler(FixedGridODESolver):
         
         f0 = func(t0, y0, x)
     
-        return dt * f0
+        return dt * f0 * 100
     
 
 # Saved state of the Runge Kutta solver.
@@ -31,11 +32,10 @@ _one_sixth = 1 / 6
 
 def rk4_step_func(func, t0, dt, t1, y0, x):
     
-    k1 = func(t0, y0, x)
-    half_dt = dt * 0.5
-    k2 = func(t0 + half_dt, y0 + half_dt * k1, x)
-    k3 = func(t0 + half_dt, y0 + half_dt * k2, x)
-    k4 = func(t1, y0 + dt * k3, x)
+    k1 = dt * func(t0, y0, x)
+    k2 = dt * func(t0 + dt / 2, y0 + k1/2,  x + k1 / 2 * np.ones_like(x))
+    k3 = dt * func(t0 + dt / 2, y0 + k2/2, x + k2 / 2 * np.ones_like(x))
+    k4 = dt * func(t0 + dt,y0 +k3/2, x + k3 * np.ones_like(x))
     return (k1 + 2 * (k2 + k3) + k4) * dt * _one_sixth
 
 
@@ -52,4 +52,4 @@ def rk4_alt_step_func(func, t0, dt, t1, y0, x):
 class RK4(FixedGridODESolver):
     order = 4
     def _step_func(self, func, t0, dt, t1, y0, x):
-        return rk4_alt_step_func(func, t0, dt, t1, y0, x)
+        return rk4_step_func(func, t0, dt, t1, y0, x)

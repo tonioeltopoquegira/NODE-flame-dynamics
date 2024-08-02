@@ -1,17 +1,21 @@
 # ToDo:
 
-
-Experiments KAN / MLP
------------
-
 NODE
 ---------
-- Understand concept of adjoint better
-- Set up problem, maybe also change the inputs!
+- Try with different history sizes - input sizes - frequency of training. Might be nice to train on very small time step once we have a good integrator / other input / interpolator.
+- Address the problem of the high frequencies
+- try new interpolator+integrator combo
+
+- New implementation on jax
 
 
-Later
---------
-- Try to incorporate heat release & Time
-- Draw inspiration from Gregor's training
-- Choosing more intelligently the data points and using times in a sort of branch? Also for 
+- > continuous time!!!
+- > precision and computation depends on integrator !!
+- > 
+
+To solve the problem we implemented two strategies:
+(1) Straight NN architecture to approximate u - > relationship (GRU, cKAN, MLP)
+(2) Model problem as an ODE and learn the implicit derivative dQ'/dt . Here we first learn using a very small time step and an integrator. Then we could take learnt model for derivative, switch integrator add an interpolator for u and see if it still performs well. In this way you can trade-off computation expense and accuracy + it's a continuum model i.e. at each point t (integrator) can output a value Q given the previous points of u (here we need interpolator because our model learns relationship)
+
+Issues:
+(1) Higher frequencies are not well captured (New data? Augmentation using data from frequency domain in order to make them more explicit? Possibly enforce more this time dependency in the input data using different architectures or attention?)
