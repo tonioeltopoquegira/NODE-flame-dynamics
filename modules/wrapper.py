@@ -17,12 +17,10 @@ class NeuralODE(nn.Module):
         self.shapes = get_param_shapes(f_prime_model)
         # TODO Interpolator compatible with torch ?
 
-    def forward(self, x, iv):
+    def forward(self, times, x, iv):
 
         # Get Times to evaluate
-        eval_times = x[:, 1, :, 0].squeeze(1).squeeze(0)
-
-        
+        eval_times = times.squeeze(0)
 
         # Get Initial value for Q
         initial_value = iv
@@ -31,14 +29,13 @@ class NeuralODE(nn.Module):
         # Velocity perturbations
         u_values = x[:, 0, :, :].squeeze(1).squeeze(0)
 
-        # Gradients?
+        # Gradients? Not sure about this!
         u_values.requires_grad_(True)
         initial_value.requires_grad_(False)
         eval_times.requires_grad_(False)
 
         out = odeint(self.f_prime_model, y0=initial_value, t=eval_times, x=u_values, method=self.integrator, shapes = self.shapes)
-
-        out = out.permute(1, 0, 2)
+        out = out.permute(1, 0)
         
         
         return out

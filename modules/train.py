@@ -58,13 +58,14 @@ def train_model(dataset, model, epochs, path, batch_size = 3, scheduler = False,
         epoch_start_time = time.time()
 
         #for i, (inputs, targets, iv) in enumerate(data_loader):
-        for i, (inputs, targets, iv) in enumerate(tqdm(data_loader, desc=f"Epoch {epoch+1}/{epochs}", unit="batch")):
+        for i, (times, inputs, targets, iv) in enumerate(tqdm(data_loader, desc=f"Epoch {epoch+1}/{epochs}", unit="batch")):
             inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
             optimizer.zero_grad()
             
+            
             # Forward pass
             
-            pred = model(inputs, iv)
+            pred = model(times, inputs, iv)
             if i == 0:
                 train_plot_pred(inputs, targets, pred, path, epoch)
 
