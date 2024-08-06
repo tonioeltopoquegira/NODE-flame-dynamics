@@ -9,6 +9,7 @@ NODE
 - New implementation on jax
 
 
+
 - > continuous time!!!
 - > precision and computation depends on integrator !!
 - > 
@@ -18,4 +19,10 @@ To solve the problem we implemented two strategies:
 (2) Model problem as an ODE and learn the implicit derivative dQ'/dt . Here we first learn using a very small time step and an integrator. Then we could take learnt model for derivative, switch integrator add an interpolator for u and see if it still performs well. In this way you can trade-off computation expense and accuracy + it's a continuum model i.e. at each point t (integrator) can output a value Q given the previous points of u (here we need interpolator because our model learns relationship)
 
 Issues:
-(1) Higher frequencies are not well captured (New data? Augmentation using data from frequency domain in order to make them more explicit? Possibly enforce more this time dependency in the input data using different architectures or attention?)
+(1) Higher frequencies are not well captured (New data? Augmentation using data from frequency domain in order to make them more explicit? For example use frequency data to adjust error of high frequencies. Possibly enforce more this time dependency in the input data using different architectures or attention?) Myabe take difference ground truth - result and do a regression w.r.t. frequencies that we are missing. 
+
+
+What to do:
+-- > Hamiltonian
+--> attention time mechanism adjust it
+--> peaks adjustment branch

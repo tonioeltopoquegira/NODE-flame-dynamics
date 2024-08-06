@@ -1,30 +1,16 @@
 import numpy as np
 import h5py
-from sklearn.utils import shuffle
 import torch
 from torch.utils.data import TensorDataset, random_split
 import math
+from modules.utils import downsampling
 
-from scipy.interpolate import interp1d
 
-
-def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_factor=3, seq_size = 500, train_percentage=0.6, inter_attrib = ['cubic', 'extrapolate']):
-
-    print(f"""
-        Explanation Dataset 
-        -------------------------
-        In principle there is observation every {1e-6*1000} ms 
-        ---> observation every {1e-6*100*1000} ms with default downsampling
-        ---> take window of {timeHistorySizeOfU} time steps before for each obs
-            i.e. a window of {1e-4*timeHistorySizeOfU*1000} ms before the heat release value (physics time of restoration is 8ms)
-        ---> of these {timeHistorySizeOfU} time steps, downsample them again of a factor of {downsampling_factor} (take one every {downsampling_factor})
-        ---> Basically one time step every {downsampling_factor*1e-6*100*1000} ms for a total of {math.ceil(timeHistorySizeOfU/downsampling_factor)} time steps
-
-        """)
+def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_inputs=3, seq_size = 500, train_percentage=0.6, downsampling_strat = 'uniform'):
 
     hf = h5py.File('data/Kornilov_Haeringer_all.h5', 'r')
 
-    input_size = math.ceil(timeHistorySizeOfU/downsampling_factor)
+    input_size = math.ceil(timeHistorySizeOfU/downsampling_inputs)
 
     # Initialize lists to hold the split data
     input_data_list = []
@@ -36,14 +22,8 @@ def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_factor
         input_data = np.array(hf.get('BB_A' + a+ '_U'))
         time_data = np.array(hf.get('BB_time'))
 
-        if a == '050':
-            # Call to interpolator 
-            u_interpolator = interp1d(time_data, input_data, kind=inter_attrib[0], fill_value=inter_attrib[1])
-
-        # Downsample the data - To do for every datasets
-        output_data = output_data[0::100] 
-        input_data = input_data[0::100]
-        time_data = time_data[0::100]
+        # Downsample the data - To do for every datasets #TODO Are we sure we used it for the NODE?
+        time_data, input_data, output_data = downsampling(time_data, input_data, output_data, downsampling_factor=100, mode=downsampling_strat)
 
         # Cut off data for which we don't have enough inputs
         output_data = output_data[timeHistorySizeOfU-1:] # FOR SOME REASON #TODO
@@ -52,8 +32,8 @@ def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_factor
         input_data = np.lib.stride_tricks.sliding_window_view(input_data, timeHistorySizeOfU)
         time_data = np.lib.stride_tricks.sliding_window_view(time_data, timeHistorySizeOfU)
         
-        input_data = input_data[:,::downsampling_factor]
-        time_data = time_data[:,::downsampling_factor]
+        input_data = input_data[:,::downsampling_inputs]
+        time_data = time_data[:,::downsampling_inputs]
         
         # Split big unique sequences into smaller sequences (trajectories) of size seq_size
         num_sequences = input_data.shape[0] // seq_size
@@ -81,27 +61,27 @@ def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_factor
 
     # Convert to torch tensors
     input_tensor = torch.tensor(input_data, dtype=torch.float32)
+    output_tensor = torch.tensor(output_data, dtype=torch.float32)
     time_tensor = torch.tensor(time_data, dtype=torch.float32)
-    output_tensor = torch.tensor(output_data, dtype=torch.float32).unsqueeze(-1)
+    input_tensor = torch.stack((time_tensor, input_tensor))
+    time_tensor = time_tensor[:, :, 0]
 
-    
-
-    input_tensor = torch.stack((input_tensor, time_tensor))
-
-   
-
+    # Adjust inputs and times
+    last_element = input_tensor[:, 0, :, -1]
+    last_element = last_element[:, :, np.newaxis]
+    input_tensor[:, 0, :, :] = - (input_tensor[:, 0, :, :] - last_element)
     # Create Initial Values tensor  
-    iv_tensor = output_tensor[:, 0, :] 
+    iv_tensor = output_tensor[:, 0]
 
+    # Permute and show shapes
     input_tensor = input_tensor.permute(1,0,2,3)
-
+    print(time_tensor.shape)
     print(input_tensor.shape)
     print(output_tensor.shape)
     print(iv_tensor.shape)
-
+    
     # Create a TensorDataset
-    dataset = TensorDataset(input_tensor, output_tensor, iv_tensor)
-    #dataset = TensorDataset(output_tensor, iv_tensor)
+    dataset = TensorDataset(time_tensor, input_tensor, output_tensor, iv_tensor)
 
     # Calculate the sizes for train, validation, and test sets
     total_samples = len(dataset)
@@ -112,13 +92,3 @@ def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_factor
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
     return train_dataset, test_dataset, input_size
-
-"""class Interpolator(torch.nn.Module):
-    
-    def __init__(self, x, y, mode):
-        super(Interpolator, self).__init__()
-        self.x = x.unsqueeze(0).unsqueeze(0)
-        self.y = y.unsqueeze(0).unsqueeze(0)
-
-    def forward(self, t):
-        return torch.interp(t, self.x, self.y)"""

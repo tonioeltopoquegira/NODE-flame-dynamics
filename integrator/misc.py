@@ -234,7 +234,6 @@ def reshape_tensor(tensor, param_shapes):
 
 
 def _check_inputs(func, y0, t, rtol, atol, method, options,  SOLVERS):
-
     # Keep reference to original func as passed in
     original_func = func
 
