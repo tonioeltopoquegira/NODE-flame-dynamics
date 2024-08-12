@@ -50,12 +50,11 @@ def run_experiment(run):
         print("Training from scratch...")
         params, mngr = init_params(model, train_dataset, path)
         
-
+    # Train from starting of params
     train_model(train_dataset, params, model, run, path, mngr)
 
     # Validation
     validate(run, model, path, test_dataset, mngr)
-
 
     record_run_from_file(run, 'run_report.xlsx', 'run_report.txt')
 
@@ -65,7 +64,7 @@ if __name__ == '__main__':
     # Dictionaries and other stuff
     'save_dict': False,
     'dict': 'runs_report.xlsx',
-    'from_scratch' : True,
+    'from_scratch' : False,
     'show_res': False,
 
     # Data preprocessing
@@ -89,7 +88,7 @@ if __name__ == '__main__':
     'initializer': 'xavier',
 
     # Training
-    'epochs': 10,
+    'epochs': 200,
     'batch_size': 3000, # (**)
     'learning_rate': 0.001,
 }

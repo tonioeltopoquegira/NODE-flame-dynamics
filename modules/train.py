@@ -20,9 +20,6 @@ DEVICE = jax.devices("gpu" if jax.lib.xla_bridge.get_backend().platform == "gpu"
 
 
 def train_model(dataset, params, model, run, path, mngr): 
-
-    print("Before training")
-    print(params)   
     
     epochs = run['epochs']
     batch_size=run['batch_size']
@@ -73,15 +70,10 @@ def train_model(dataset, params, model, run, path, mngr):
         
         loss_train[epoch] = epoch_loss
 
-        if epoch_loss < min_loss:
-            min_loss = epoch_loss
-            ckpt = {'state' : state}
-            mngr.save(epoch, ckpt)
+        
 
-    restored_ckpt = mngr.restore(mngr.latest_step())
-    restored_params = restored_ckpt["state"]["params"]
-    print("Inside train")
-    print(restored_params)
+    ckpt = {'state' : state}
+    mngr.save(epoch, ckpt)
     plt.plot(np.arange(epochs), loss_train)
     plt.title("Training Loss")
     plt.savefig(f"figures/{path}/training_loss.png")

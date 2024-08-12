@@ -15,8 +15,6 @@ def validate(run, model, path, dataset, mngr):
 
     restored_ckpt = mngr.restore(mngr.latest_step())
     restored_params = restored_ckpt["state"]["params"]
-    print("Inside Valid")
-    print(restored_params)
 
     if run['model']=='node': 
         for (times, x, y, iv), en in zip(dataset, range(num_traj)):
