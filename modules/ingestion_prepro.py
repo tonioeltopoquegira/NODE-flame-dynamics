@@ -1,12 +1,18 @@
 import numpy as np
 import h5py
 import torch
-from torch.utils.data import TensorDataset, random_split
 import math
-from modules.utils import downsampling
+from modules.utils import downsampling, random_split
 
 
-def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_inputs=3, seq_size = 500, train_percentage=0.6, downsampling_strat = 'uniform'):
+def ingestion_preprocess(run):
+
+    amplitudes= run['amplitudes']
+    seq_size=run['seq_size']
+    train_percentage=run['train_percentage']
+    downsampling_inputs=run['input_downsample_factor']
+    timeHistorySizeOfU=100
+    downsampling_strat= run['downsampling_strat']
 
     hf = h5py.File('data/Kornilov_Haeringer_all.h5', 'r')
 
@@ -60,35 +66,23 @@ def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_inputs
     time_data = np.stack(time_data_list)
 
     # Convert to torch tensors
-    input_tensor = torch.tensor(input_data, dtype=torch.float32)
-    output_tensor = torch.tensor(output_data, dtype=torch.float32)
-    time_tensor = torch.tensor(time_data, dtype=torch.float32)
-    input_tensor = torch.stack((time_tensor, input_tensor))
-    time_tensor = time_tensor[:, :, 0]
+    input_data = np.stack((time_data, input_data)).swapaxes(0, 1)
+    time_data= time_data[:, :, 0]
 
     # Adjust inputs and times
-    last_element = input_tensor[:, 0, :, -1]
+    last_element = input_data[:, 0, :, -1]
     last_element = last_element[:, :, np.newaxis]
-    input_tensor[:, 0, :, :] = - (input_tensor[:, 0, :, :] - last_element)
+    input_data[:, 0, :, :] = - (input_data[:, 0, :, :] - last_element)
     # Create Initial Values tensor  
-    iv_tensor = output_tensor[:, 0]
+    iv_data = output_data[:, 0]
 
     # Permute and show shapes
-    input_tensor = input_tensor.permute(1,0,2,3)
-    print(time_tensor.shape)
-    print(input_tensor.shape)
-    print(output_tensor.shape)
-    print(iv_tensor.shape)
+    print(time_data.shape)
+    print(input_data.shape)
+    print(output_data.shape)
+    print(iv_data.shape)
     
-    # Create a TensorDataset
-    dataset = TensorDataset(time_tensor, input_tensor, output_tensor, iv_tensor)
-
-    # Calculate the sizes for train, validation, and test sets
-    total_samples = len(dataset)
-    train_size = math.ceil(total_samples * (train_percentage))
-    test_size = total_samples - train_size
-    
-    # Split the dataset
-    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    # Split the dataset - Error here
+    train_dataset, test_dataset = random_split(time_data, input_data, output_data, iv_data, split_ratio= train_percentage)
 
     return train_dataset, test_dataset, input_size

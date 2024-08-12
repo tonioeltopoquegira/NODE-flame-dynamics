@@ -1,19 +1,24 @@
 import numpy as np
+import jax.numpy as jnp
 import h5py
-from sklearn.utils import shuffle
-import torch
-from torch.utils.data import TensorDataset, random_split
 import math
-import matplotlib.pyplot as plt
 
-from modules.utils import downsampling
+
+from modules.utils import downsampling, random_split
+
 
 # In principle there is observation every 1e-6s ----> 1e-4 every time step with downsampling 
 # ----> take 100 time steps before i.e. let's say from 0s to 1e-2s (10 ms, physics time of restoration is 8ms)
 # ----> of these 100 time steps, downsample them again of a factor of 3 (take one every 3)
 # ----> Basically one time step every 3e-4
 
-def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_inputs=3, train_percentage=0.9, downsampling_strat = 'uniform'):
+def ingestion_preprocess(run):
+
+    amplitudes=run['amplitudes']
+    timeHistorySizeOfU=100
+    downsampling_inputs=run['input_downsample_factor']
+    train_percentage=run['train_percentage']
+    downsampling_strat=run['downsampling_strat']
 
     hf = h5py.File('data/Kornilov_Haeringer_all.h5', 'r')
 
@@ -24,7 +29,6 @@ def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_inputs
     output_data_list = []
     time_data_list = []
 
-    
     for a in amplitudes:
         output_data = np.array(hf.get('BB_A' + a+ '_Q'))
         input_data = np.array(hf.get('BB_A' + a+ '_U'))
@@ -49,38 +53,22 @@ def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_inputs
         time_data_list.append(time_data)
 
     # Concatenate the data from all amplitudes
-    input_data = np.stack(input_data_list)
-    output_data = np.stack(output_data_list)
-    time_data = np.stack(time_data_list)
-
-    # Convert to torch tensors
-    input_tensor = torch.tensor(input_data, dtype=torch.float32)
-    time_tensor = torch.tensor(time_data, dtype=torch.float32)
-    output_tensor = torch.tensor(output_data, dtype=torch.float32)
+    input_data = np.stack(input_data_list).squeeze(0)
+    output_data = np.stack(output_data_list).squeeze(0)
+    time_data = np.stack(time_data_list).squeeze(0)
 
     # Adjust inputs and times
-    input_tensor = torch.stack((time_tensor, input_tensor))
-    last_element = input_tensor[:, 0, :, -1]
-    last_element = last_element[:, :, np.newaxis]
-    input_tensor[:, 0, :, :] = - (input_tensor[:, 0, :, :] - last_element)
-
-
-    # Permute and show shapes
-    input_tensor = input_tensor.squeeze(1).permute(1, 0,2)
-    output_tensor = output_tensor.transpose(0,1)
-    print(input_tensor.shape)
-    print(output_tensor.shape)
+    input_data = np.stack((time_data, input_data)).swapaxes(0,1)
+    time_data = time_data[:, 0]
+    last_element = input_data[:, 0, -1]
+    last_element = last_element[:, np.newaxis]
+    input_data[:, 0, :] = - (input_data[:, 0, :] - last_element)
     
-    # Create a TensorDataset
-    dataset = TensorDataset(input_tensor, output_tensor)
+    #print(input_data.shape)
+    #print(input_data[0, :, :])
 
-    # Calculate the sizes for train, validation, and test sets
-    total_samples = len(dataset)
-    train_size = math.ceil(total_samples * (train_percentage))
-    test_size = total_samples - train_size
-    
     # Split the dataset
-    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    train_dataset, test_dataset = random_split(time_data, input_data, output_data, split_ratio=train_percentage)
 
     return train_dataset, test_dataset, input_size
 
