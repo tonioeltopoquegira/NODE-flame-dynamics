@@ -67,9 +67,6 @@ def ingestion_preprocess(amplitudes, timeHistorySizeOfU=100, downsampling_inputs
     # Permute and show shapes
     input_tensor = input_tensor.squeeze(1).permute(1, 0,2)
     output_tensor = output_tensor.transpose(0,1)
-
-    print(input_tensor.shape)
-    print(input_tensor[0, :, :])
     
     # Create a TensorDataset
     dataset = TensorDataset(input_tensor, output_tensor)

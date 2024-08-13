@@ -1,16 +1,17 @@
-
+import flax.linen as nn
 import jax.numpy as jnp
+import jax
 import jax.random as random
-import matplotlib.pyplot as plt
 
+class Interpolator1D(nn.Module):
+    times: jnp.ndarray
+    values: jnp.ndarray
+    method: str
 
-class Interpolator1D:
-    def __init__(self, times, values, method):
-        self.times = times
-        self.values = values
-        self.method = method
+    def setup(self):
+        pass 
 
-    def interpolate(self, t_evaluation, deg=None):
+    def __call__(self, t_evaluation, deg=None):
         if self.method == "linear":
             return self._linear_interpolate(t_evaluation)
         elif self.method == "cubic-poly":
@@ -32,23 +33,16 @@ class Interpolator1D:
     def _polynomial_interpolate(self, t_evaluation, deg):
         idx = jnp.searchsorted(self.times, t_evaluation) - 1
         idx = jnp.clip(idx, 1, len(self.times) - deg)
-        idxs = jnp.zeros((len(t_evaluation), deg), dtype=int)
 
-        # Use the JAX functional approach to populate idxs
-        idxs = idxs.at[:, 0].set(idx - 1)
-        idxs = idxs.at[:, 1].set(idx)
-        idxs = idxs.at[:, 2].set(idx + 1)
-        
-        sol = jnp.zeros_like(t_evaluation)
+        def interpolate_single(t, idx):
+            idxs = jnp.arange(idx - 1, idx + 2)  # Adjusted for cubic interpolation (degree 2)
+            coefs = jnp.polyfit(self.times[idxs], self.values[idxs], deg=deg)
+            return jnp.polyval(coefs, t)
 
-        # Use the JAX functional approach to populate sol
-        for i in range(len(sol)):
-            coefs = jnp.polyfit(self.times[idxs[i, :]], self.values[idxs[i, :]], deg=deg)
-            sol = sol.at[i].set(jnp.polyval(coefs, t_evaluation[i]))
+        return jax.vmap(interpolate_single)(t_evaluation, idx)
 
-        return sol
-    
 
+import matplotlib.pyplot as plt
 
 def test_interpolation():
 
@@ -87,8 +81,8 @@ def test_interpolation():
     inter_cubic = Interpolator1D(times_provided, values, method='cubic-poly')
 
     # Interpolate values at the excluded times
-    interpolated_values_linear = inter.interpolate(times_to_interpolate, deg = 1)
-    interpolated_values_cubic = inter_cubic.interpolate(times_to_interpolate, deg = 4)
+    interpolated_values_linear = inter(times_to_interpolate, deg = 1)
+    interpolated_values_cubic = inter_cubic(times_to_interpolate, deg = 4)
 
     # Plot the results
     plt.figure(figsize=(10, 6))

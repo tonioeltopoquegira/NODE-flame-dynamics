@@ -6,7 +6,7 @@ from flax.training import train_state
 import shutil
 
 
-def init_params(model, dataset, path):
+def init_params(model, run, dataset, path):
 
     # Create Checkpoint Manager
     checkpointer = ocp.PyTreeCheckpointer()
@@ -16,13 +16,22 @@ def init_params(model, dataset, path):
     # Create a Manager
     mngr = ocp.CheckpointManager(save_path, checkpointer, options)
 
-    # Initialize the RNG and model parameters
+    rng = random.PRNGKey(run['seed'])
     shape_input = dataset[1].shape[1:]
-    dummy_batch_size = (10000,)
-    shape_input = dummy_batch_size + shape_input
-    rng = random.PRNGKey(0)
-    params = model.init(rng, jnp.ones(shape_input))['params']
 
+    # Initialize the RNG and model parameters
+    if run['model'] == 'node':
+        shape_times = dataset[0].shape[1:]
+        shape_iv = dataset[3].shape[1:]
+        params = model.init(rng, jnp.linspace(0, len(shape_times)), jnp.ones(shape_input), jnp.ones(shape_iv))['params']
+    else:
+        
+        dummy_batch_size = (10000,)
+        shape_input = dummy_batch_size + shape_input
+        params = model.init(rng, jnp.ones(shape_input))['params']
+        
+    
+    
     # Delete the previous stuff
     if os.path.exists(save_path):
         shutil.rmtree(save_path)

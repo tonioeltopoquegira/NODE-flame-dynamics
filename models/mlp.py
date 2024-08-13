@@ -3,9 +3,8 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 import flax.linen as nn
-from flax import linen as nn
 #from flax.core import FreezeDict
-import jax.nn
+import jax.nn as jnn
 import jax.numpy as jnp
 
 from modules.utils import choose_nonlinearity
@@ -25,6 +24,9 @@ class mlp(nn.Module):
 
         elif self.initializer == 'normal':
             dense_init = nn.initializers.normal(0.1)
+        
+        elif self.initializer == 'zeros':
+            dense_init = nn.initializers.zeros_init()
 
         bias_init = nn.initializers.zeros_init()
 
@@ -70,9 +72,9 @@ class mlp(nn.Module):
             x = x * att_params 
         
         # Apply transformation to u values
-        for layer in self.layers:
+        for layer in self.layers[:-1]:
             x = self.nonlinearity_fn(layer(x))
-        out = x
+        out = nn.tanh(self.layers[-1](x))
 
         if self.time_dependency == "time-branch":
 

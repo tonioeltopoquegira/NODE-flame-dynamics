@@ -19,21 +19,6 @@ def train_model(dataset, model, epochs, model_name, path, batch_size = 3, schedu
     # optimizer & scheduler
     optimizer = optim.Adam(model.parameters(), lr= learning_rate)
 
-    if scheduler:
-        """
-        Adam can substantially benefit from a scheduled learning rate multiplier. The fact that Adam
-        is an adaptive gradient algorithm and as such adapts the learning rate for each parameter
-        does not rule out the possibility to substantially improve its performance by using a global
-        learning rate multiplier, scheduled, e.g., by cosine annealing.
-
-        https://discuss.pytorch.org/t/with-adam-optimizer-is-it-necessary-to-use-a-learning-scheduler/66477/2
-        """
-        # This is not very useful with Adam! May be conflicting
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=150, gamma=0.7)
-        #scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.975)
-        #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=600, T_mult=10)
-        pass
-
     # criterion
     criterion = nn.MSELoss()
     
@@ -45,6 +30,7 @@ def train_model(dataset, model, epochs, model_name, path, batch_size = 3, schedu
     loss_train = np.zeros(epochs)
 
     torch.autograd.set_detect_anomaly(True)
+
     
     for epoch in range(epochs):
 
@@ -69,14 +55,17 @@ def train_model(dataset, model, epochs, model_name, path, batch_size = 3, schedu
             else:
                 pred = model(inputs)
             
-            if i == 0 and (epoch+1)%1 == 0 and 'node' in model_name:
-                train_plot_pred(times, targets, pred, path, epoch+1)
 
             loss = criterion(pred, targets)
+
+            print(loss)
 
 
             # Backpropagation
             loss.backward()
+            for name, param in model.named_parameters():
+                print(f"{name} Grad: {param.grad}")
+        
             optimizer.step()
             
             epoch_loss += loss.item()
@@ -84,9 +73,6 @@ def train_model(dataset, model, epochs, model_name, path, batch_size = 3, schedu
         epoch_end_time = time.time()
         epoch_time = epoch_end_time - epoch_start_time
         
-        if 'att' in model_name and (epoch+1)% 100 == 0:
-            model.plot_attention(path, epoch+1)
-                
 
         if scheduler:
             scheduler.step()

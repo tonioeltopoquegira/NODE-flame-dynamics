@@ -7,15 +7,13 @@ from modules.utils import mse_loss, data_loader
 
 # Validation file
 
-def validate(run, model, path, dataset, mngr):
+def validate(run, restored_params, model, path, dataset):
     model_name = run['model_name']
     num_traj = 2
     err = 0.0
     num_obs = 0
 
-    restored_ckpt = mngr.restore(mngr.latest_step())
-    restored_params = restored_ckpt["state"]["params"]
-
+    
     if run['model']=='node': 
         for (times, x, y, iv), en in zip(dataset, range(num_traj)):
             pred = model(times, x, iv)
@@ -34,8 +32,12 @@ def validate(run, model, path, dataset, mngr):
     
     else:
         data_load = data_loader(*dataset, batch_size=200)
-        for (t, x,y), en in zip(data_load, range(num_traj)):
+        for en, (t, x,y) in enumerate(data_load):
+            sorted_indices = np.argsort(t)
+            t = t[sorted_indices]
+            y = y[sorted_indices]
             pred = model.apply({'params': restored_params}, x)
+            pred = pred[sorted_indices]
             plt.figure(figsize=(16, 8))
             plt.plot(y, label='Ground Truth', linestyle='-', color='k')
             plt.plot(pred, label='Prediction', linestyle='-', color='r')

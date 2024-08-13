@@ -1,37 +1,25 @@
-import torch
-import torch.nn as nn
+import flax.linen as nn
+import jax.numpy as jnp
+from models.node_utils.integrator import Integrator
+
+# NOTE!
+# (1) Interpolator for two dimensions of x are different (one should just be the transf of times --> distance time, the other a proper interpolator)
+# (2) How do you choose w.r.t. which values of amplitude to interpolate?
+
 
 class NeuralODE(nn.Module):
 
-    def __init__(self, f_prime_model, integrator):
-        super(NeuralODE, self).__init__()
+    f_prime_model: nn.module
+    integ_strat: str
+    integ_meth: str 
+    interp: nn.module
 
-        self.f_prime_model = f_prime_model # this is a nn.Module that takes in its forward (t, Q0)
-        self.integrator = integrator # this is a string code to choose integrator
-        self.shapes = get_param_shapes(f_prime_model)
-        # TODO Interpolator compatible with torch ?
+    def setup(self):
 
-    def forward(self, times, x, iv):
+        self.integrator = Integrator(strategy=self.integ_strat, method=self.integ_meth, interp=self.interp)
 
-        # Get Times to evaluate
-        eval_times = times.squeeze(0)
+    def __call__(self, times, x, iv):
+    
+        t_evaluation, out = self.integrator(self.f_prime_model, t_evaluation=times, y0=iv, other_inputs = x)
 
-        # Get Initial value for Q
-        initial_value = iv
-
-        
-        # Velocity perturbations
-        u_values = x[:, 1, :, :].squeeze(1).squeeze(0)
-
-        # Gradients? Not sure about this!
-        u_values.requires_grad_(True)
-        initial_value.requires_grad_(False)
-        eval_times.requires_grad_(False)
-
-        out = odeint(self.f_prime_model, y0=initial_value, t=eval_times, x=u_values, method=self.integrator, shapes = self.shapes)
-        out = out.permute(1, 0)
-        
-        
-        return out
-
-
+        return t_evaluation, out

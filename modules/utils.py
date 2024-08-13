@@ -252,8 +252,15 @@ def data_loader(*arrays, batch_size):
         yield tuple(array[batch_indices] for array in arrays)
 
 def train_plot_pred(times, targets, pred, path, epoch):
-    plt.plot(times, targets, label='Ground Truth', linestyle='--', color='k')
-    plt.plot(times, pred, label='Prediction', linestyle='-', color='r')
+    sorted_indices = jnp.argsort(times)
+    times = times[sorted_indices]
+    targets = targets[sorted_indices]
+    pred = pred[sorted_indices]
+
+    os.makedirs(f"figures/{path}/training_process", exist_ok=True)
+    plt.figure(figsize=(16, 8))
+    plt.plot(times[200:], targets[200:], label='Ground Truth', linestyle='--', color='k')
+    plt.plot(times[200:], pred[200:], label='Prediction', linestyle='-', color='r')
     plt.title(f"Prediction at epoch {epoch}")
     plt.legend()
     plt.savefig(f"figures/{path}/training_process/{epoch}.png")
@@ -261,6 +268,9 @@ def train_plot_pred(times, targets, pred, path, epoch):
 
 def mse_loss(pred, target):
     return jnp.mean((pred - target) ** 2)
+
+def mae_loss(pred, target):
+    return jnp.mean(jnp.abs(pred-target))
 
 # MODELS 
 

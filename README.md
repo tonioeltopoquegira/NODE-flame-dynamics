@@ -26,3 +26,18 @@ What to do:
 -- > Hamiltonian
 --> attention time mechanism adjust it
 --> peaks adjustment branch
+
+
+
+TO SOLVE:
+(!) backward pass of neural ODE on jax (put interpolator inside the model! No inputs! Redesign)
+(!) discrepancy of the solutions of torch / jax and mse during training and at validation
+
+
+THEN:
+(1) Attention mechanism trick
+(2) Non-uniform sampling
+(3) Adaptive integration
+
+MAYBE:
+(*) Error branch with fft

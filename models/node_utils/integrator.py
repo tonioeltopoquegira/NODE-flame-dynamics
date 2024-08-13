@@ -1,22 +1,26 @@
+import flax.linen as nn
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-class Integrator:
-    def __init__(self, strategy, method, interpolator):
-        self.strategy = strategy
-        self.interp = interpolator
-        self.method = method
+# NOTE!
+# (1) When to stop adaptive integration?
 
-    
-    def integrate(self, fun, t_evaluation, y0):
+class Integrator(nn.Module):
+    strategy: str
+    method: str
+    interp: nn.Module 
 
+    def setup(self):
+        pass
+
+    @nn.compact
+    def __call__(self, fun, t_evaluation, y0):
         if self.strategy == 'fixed-grid':
-            out = self.fixed_grid(fun, t_evaluation, y0)
-        
-        if self.strategy == 'adaptive':
-            out = self.adaptive(fun, t_evaluation, y0)
-
-        return out
+            return self.fixed_grid(fun, t_evaluation, y0)
+        elif self.strategy == 'adaptive':
+            return self.adaptive(fun, t_evaluation, y0)
+        else:
+            raise ValueError(f"Unknown strategy: {self.strategy}")
     
     def fixed_grid(self, fun, t_evaluation, y0):
         """
@@ -27,7 +31,9 @@ class Integrator:
         y = y.at[0].set(y0)
         
         for en, (dt, t) in enumerate(zip(delta_ts, t_evaluation[:-1])):  # Exclude the last time step for iteration
-            dy = self.step(fun, dt, t)  # Replace with the actual step function
+            dy = self.step(fun, dt, t[:, en, :])  # Replace with the actual step function
+            dy = jnp.squeeze(dy, axis = 0)
+            dy = jnp.squeeze(dy, axis = 0)
             y = y.at[en + 1].set(y[en] + dy)
         
         return (t_evaluation, y)
@@ -76,22 +82,20 @@ class Integrator:
         return jnp.array([r[0] for r in result]), jnp.array([r[1] for r in result])
 
     def step(self, fun, dt, t):
-        """
-        Placeholder for the step function.
-        """
+        # My model doesn't really take x in as a value... It could take whichever number of interpolator evaluations to compute my result
 
         if self.method == 'euler':
-            u = self.interp.interpolate(t) 
+            u = self.interp(t) # Maybe move the interpolator inside the model ? Make the model depend on t only from the outside
             dy = fun(u) * dt
             return dy
 
         elif self.method == 'rk4':
             # For RK4 method
-            u = self.interp.interpolate(t) 
+            u = self.interp(t) 
             k1 = fun(u)
-            k2 = fun(self.interp.interpolate(t + 0.5 * dt))  
-            k3 = fun(self.interp.interpolate(t + 0.5 * dt))  
-            k4 = fun(self.interp.interpolate(t + dt))
+            k2 = fun(self.interp(t + 0.5 * dt))  
+            k3 = fun(self.interp(t + 0.5 * dt))  
+            k4 = fun(self.interp(t + dt))
             dy = (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
             return dy
 

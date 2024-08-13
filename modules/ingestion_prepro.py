@@ -3,6 +3,7 @@ import h5py
 import torch
 import math
 from modules.utils import downsampling, random_split
+from models.node_utils.interpolator import Interpolator1D
 
 
 def ingestion_preprocess(run):
@@ -28,6 +29,8 @@ def ingestion_preprocess(run):
         input_data = np.array(hf.get('BB_A' + a+ '_U'))
         time_data = np.array(hf.get('BB_time'))
 
+        interpol = Interpolator1D(time_data, input_data, 'linear')
+
         # Downsample the data - To do for every datasets #TODO Are we sure we used it for the NODE?
         time_data, input_data, output_data = downsampling(time_data, input_data, output_data, downsampling_factor=100, mode=downsampling_strat)
 
@@ -42,7 +45,7 @@ def ingestion_preprocess(run):
         time_data = time_data[:,::downsampling_inputs]
         
         # Split big unique sequences into smaller sequences (trajectories) of size seq_size
-        num_sequences = input_data.shape[0] // seq_size
+        num_sequences = len(input_data) // seq_size
 
         for i in range(num_sequences):
 
@@ -73,16 +76,18 @@ def ingestion_preprocess(run):
     last_element = input_data[:, 0, :, -1]
     last_element = last_element[:, :, np.newaxis]
     input_data[:, 0, :, :] = - (input_data[:, 0, :, :] - last_element)
+    #input_data = input_data[:, 0, :, :] # only time steps to evaluate function!
+
     # Create Initial Values tensor  
     iv_data = output_data[:, 0]
 
     # Permute and show shapes
-    print(time_data.shape)
-    print(input_data.shape)
-    print(output_data.shape)
-    print(iv_data.shape)
+    print(f"Times: {time_data.shape}")
+    print(f"Input Data: {input_data.shape}")
+    print(f"Output Data: {output_data.shape}")
+    print(f"Initial Values: {iv_data.shape}")
     
     # Split the dataset - Error here
     train_dataset, test_dataset = random_split(time_data, input_data, output_data, iv_data, split_ratio= train_percentage)
 
-    return train_dataset, test_dataset, input_size
+    return train_dataset, test_dataset, input_size, interpol

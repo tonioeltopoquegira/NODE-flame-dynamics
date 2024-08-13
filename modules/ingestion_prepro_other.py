@@ -46,7 +46,7 @@ def ingestion_preprocess(run):
         
         input_data = input_data[:,::downsampling_inputs]
         time_data = time_data[:,::downsampling_inputs]
-        
+
         # Append the sequences to the respective lists
         input_data_list.append(input_data)
         output_data_list.append(output_data)
@@ -63,9 +63,11 @@ def ingestion_preprocess(run):
     last_element = input_data[:, 0, -1]
     last_element = last_element[:, np.newaxis]
     input_data[:, 0, :] = - (input_data[:, 0, :] - last_element)
-    
-    #print(input_data.shape)
-    #print(input_data[0, :, :])
+
+    print(f"Time data: {time_data.shape}")
+    print(f"Input data: {input_data.shape}")
+    print(f"Output data: {output_data.shape}")
+
 
     # Split the dataset
     train_dataset, test_dataset = random_split(time_data, input_data, output_data, split_ratio=train_percentage)

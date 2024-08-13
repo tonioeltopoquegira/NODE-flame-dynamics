@@ -28,18 +28,21 @@ def run_experiment(run):
     path = set_up_folders(run)
 
     if run['model'] in ['node', 'gru']:
-        train_dataset, test_dataset, input_size = ingestion_preprocess_node(run)
+
+        train_dataset, test_dataset, input_size, interpol = ingestion_preprocess_node(run)
     else:
         train_dataset, test_dataset, input_size = ingestion_preprocess_other(run)
 
     if run['model'] == 'node':
+
         # create integrator, interpolator and model for fprime
-        model = NeuralODE(f_prime_model=fprime_mlp(input_size), integrator='euler')
+        model_f_prime = mlp(input_sizes=[input_size] + run['hidd_sizes'], nonlinearity=run['nonlinearity'], time_dependency=run['time-dep'], time_sizes=run['time_hidd_sizes'], initializer=run['initializer'])
+        model = NeuralODE(f_prime_model= model_f_prime, integ_strat=run['integ_strat'], integ_meth=run['integ_method'], interp=interpol)
 
     elif run['model'] == 'mlp':
         model = mlp(input_sizes=[input_size] + run['hidd_sizes'], nonlinearity=run['nonlinearity'], time_dependency=run['time-dep'], time_sizes=run['time_hidd_sizes'], initializer=run['initializer'])
 
-    if os.path.exists(f"weights/{path}") and not run['from_scratch']:
+    if not run['from_scratch']:
 
         # Update the weights
         print("Loading existing weights...")
@@ -47,16 +50,21 @@ def run_experiment(run):
         params, mngr = restore_params(path)
     
     else:
-        print("Training from scratch...")
-        params, mngr = init_params(model, train_dataset, path)
+        print("Initializing weights from scratch...")
+        params, mngr = init_params(model, run, train_dataset, path)
         
     # Train from starting of params
-    train_model(train_dataset, params, model, run, path, mngr)
+    mngr = train_model(train_dataset, params, model, run, path, mngr)
+
 
     # Validation
-    validate(run, model, path, test_dataset, mngr)
+    restored_ckpt = mngr.restore(mngr.latest_step())
+    restored_params = restored_ckpt["state"]["params"]
+    validate(run, restored_params, model, path, test_dataset)
 
     record_run_from_file(run, 'run_report.xlsx', 'run_report.txt')
+
+    return model, restored_params
 
 if __name__ == '__main__':
     
@@ -64,33 +72,35 @@ if __name__ == '__main__':
     # Dictionaries and other stuff
     'save_dict': False,
     'dict': 'runs_report.xlsx',
-    'from_scratch' : False,
-    'show_res': False,
+    'from_scratch' : True,
+    'show_res': True,
+    'seed':42,
 
     # Data preprocessing
-    'amplitudes': ['050'],
-    'seq_size': 500,
+    'amplitudes': ['050'], 
+    'seq_size': 10, # (*)
     'train_percentage': 0.9,
     'input_downsample_factor': 3,
     'downsampling_strat': 'uniform',
     'interpolator': 'linear', #     (*)
 
     # Model
-    'model_name' : 'mlp_lin',
-    'model': 'mlp',
+    'model_name' : 'node_first',
+    'model': 'node',
     'integ_strat': 'fixed-grid', # ['fixed-grid', 'adaptive']   (*)
-    'integ_method': 'rk4', # ['euler', 'rk4']   (*)
+    'integ_method': 'euler', # ['euler', 'rk4']   (*)
     'deriv_model': 'mlp', # [ 'mlp' ]   (*)
     'hidd_sizes': [1],
-    'nonlinearity': 'tanh', # ['tanh', 'relu', 'sigmoid', 'softplus', 'elu', 'selu', 'swish']
+    'nonlinearity': 'relu', # ['tanh', 'relu', 'sigmoid', 'softplus', 'elu', 'selu', 'swish']
     'time-dep':'none', # ['time-att', 'time-branch']
     'time_hidd_sizes': [1,3,1],
     'initializer': 'xavier',
 
     # Training
-    'epochs': 200,
-    'batch_size': 3000, # (**)
-    'learning_rate': 0.001,
+    'epochs': 1,
+    'batch_size': 600, # (**)
+    'learning_rate': 0.003,
+    'opt' : 'adam'
 }
 
 # (*) APPLICABLE ONLY IF MODEL IS 'node'
