@@ -1,6 +1,7 @@
 import flax.linen as nn
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+import jax
 
 # NOTE!
 # (1) When to stop adaptive integration?
@@ -13,16 +14,15 @@ class Integrator(nn.Module):
     def setup(self):
         pass
 
-    @nn.compact
-    def __call__(self, fun, t_evaluation, y0):
+    def __call__(self, fun, t_evaluation, y0, deriv_eval):
         if self.strategy == 'fixed-grid':
-            return self.fixed_grid(fun, t_evaluation, y0)
+            return self.fixed_grid(fun, t_evaluation, y0, deriv_eval)
         elif self.strategy == 'adaptive':
-            return self.adaptive(fun, t_evaluation, y0)
+            return self.adaptive(fun, t_evaluation, y0, deriv_eval)
         else:
             raise ValueError(f"Unknown strategy: {self.strategy}")
     
-    def fixed_grid(self, fun, t_evaluation, y0):
+    def fixed_grid(self, fun, t_evaluation, y0, deriv_eval):
         """
         Perform numerical integration using fixed grid.
         """
@@ -31,9 +31,7 @@ class Integrator(nn.Module):
         y = y.at[0].set(y0)
         
         for en, (dt, t) in enumerate(zip(delta_ts, t_evaluation[:-1])):  # Exclude the last time step for iteration
-            dy = self.step(fun, dt, t[:, en, :])  # Replace with the actual step function
-            dy = jnp.squeeze(dy, axis = 0)
-            dy = jnp.squeeze(dy, axis = 0)
+            dy = self.step(fun, dt, t, deriv_eval[en, :])
             y = y.at[en + 1].set(y[en] + dy)
         
         return (t_evaluation, y)
@@ -81,23 +79,44 @@ class Integrator(nn.Module):
         
         return jnp.array([r[0] for r in result]), jnp.array([r[1] for r in result])
 
-    def step(self, fun, dt, t):
+    def step(self, fun, dt, t, deriv_eval):
         # My model doesn't really take x in as a value... It could take whichever number of interpolator evaluations to compute my result
 
         if self.method == 'euler':
-            u = self.interp(t) # Maybe move the interpolator inside the model ? Make the model depend on t only from the outside
-            dy = fun(u) * dt
-            return dy
+            # Create jnp.array of u's observations from t_eval using interpolator ---> one evaluation of derivative at time t
+            # TODO
+            xs = self.interp_expand(t, deriv_eval)
+            dy = fun(xs) * dt 
+            dy = jnp.squeeze(dy, 0)
+            dy = jnp.squeeze(dy, 0)
+            return dy * 100
 
         elif self.method == 'rk4':
+
             # For RK4 method
-            u = self.interp(t) 
-            k1 = fun(u)
-            k2 = fun(self.interp(t + 0.5 * dt))  
-            k3 = fun(self.interp(t + 0.5 * dt))  
-            k4 = fun(self.interp(t + dt))
+            # Create jnp.array of u's observations from t_eval using interpolator ---> one evaluation of derivative at time t0
+            # TODO
+            x0s = self.interp_expand(t, deriv_eval)
+            # After we want the u's obbservations necessary to evaluate at t1 = t+0.5*dt and at t2 = t+dt ---> other 2 u jnp.array's
+            x1s = self.interp_expand(t+0.5*dt, deriv_eval)
+            x2s = self.interp_expand(t+dt, deriv_eval)
+
+            k1 = fun(x0s)
+            k2 = fun(x1s)  
+            k3 = fun(x1s)  
+            k4 = fun(x2s)
             dy = (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
             return dy
+        
+    def interp_expand(self, t, deriv_eval):
+        # Compute the differences between t and deriv_eval in a JAX-native way
+        t_shifted = t - deriv_eval
+        # Apply self.interp to each element in t_shifted using vmap, which vectorizes the function
+        us = jax.vmap(self.interp)(t_shifted)
+        xs = jnp.stack([deriv_eval, us])
+        xs = jnp.expand_dims(xs, axis = 0)
+        return xs
+
 
 
 def test_integrator():

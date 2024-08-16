@@ -58,13 +58,9 @@ def train_model(dataset, model, epochs, model_name, path, batch_size = 3, schedu
 
             loss = criterion(pred, targets)
 
-            print(loss)
-
 
             # Backpropagation
             loss.backward()
-            for name, param in model.named_parameters():
-                print(f"{name} Grad: {param.grad}")
         
             optimizer.step()
             
@@ -158,6 +154,11 @@ def train_plot_pred(times, targets, pred, path, epoch):
     times = times.squeeze(0).detach().cpu().numpy()
     targets = targets.detach().cpu().numpy()
     pred = pred.detach().cpu().numpy()
+
+    sorted_indices = np.argsort(times)
+    times = times[sorted_indices]
+    targets = targets[sorted_indices]
+    pred = pred[sorted_indices]
 
     plt.plot(times, targets, label='Ground Truth', linestyle='--', color='k')
     plt.plot(times, pred, label='Prediction', linestyle='-', color='r')

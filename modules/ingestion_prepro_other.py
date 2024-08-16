@@ -29,16 +29,26 @@ def ingestion_preprocess(run):
     output_data_list = []
     time_data_list = []
 
+    def standardize(data):
+        """ Standardize the data to have mean 0 and standard deviation 1 """
+        data_mean = np.mean(data, axis=0, keepdims=True)
+        data_std = np.std(data, axis=0, keepdims=True)
+        standardized_data = (data - data_mean) / data_std
+        return standardized_data
+
+
     for a in amplitudes:
         output_data = np.array(hf.get('BB_A' + a+ '_Q'))
+        #output_data = standardize(output_data)
         input_data = np.array(hf.get('BB_A' + a+ '_U'))
+        #input_data = standardize(input_data)
         time_data = np.array(hf.get('BB_time'))
 
         # Downsample the data - To do for every datasets
         time_data, input_data, output_data = downsampling(time_data, input_data, output_data, downsampling_factor=100, mode=downsampling_strat)
 
         # Cut off data for which we don't have enough inputs
-        output_data = output_data[timeHistorySizeOfU-1:] # FOR SOME REASON #TODO
+        output_data = output_data[timeHistorySizeOfU-1:]
 
         # Reshape the data using sliding window view
         input_data = np.lib.stride_tricks.sliding_window_view(input_data, timeHistorySizeOfU)
@@ -72,6 +82,6 @@ def ingestion_preprocess(run):
     # Split the dataset
     train_dataset, test_dataset = random_split(time_data, input_data, output_data, split_ratio=train_percentage)
 
-    return train_dataset, test_dataset, input_size
+    return train_dataset, test_dataset, input_size, None
 
 

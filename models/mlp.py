@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as jnp
 import flax.linen as nn
-#from flax.core import FreezeDict
 import jax.nn as jnn
 import jax.numpy as jnp
 
@@ -19,16 +18,16 @@ class mlp(nn.Module):
     def setup(self):
 
         # Initializers
-        if self.initializer == 'xavier':
+        if self.initializer[0] == 1:
             dense_init = nn.initializers.xavier_uniform()
 
-        elif self.initializer == 'normal':
+        elif self.initializer[0] == 2:
             dense_init = nn.initializers.normal(0.1)
         
-        elif self.initializer == 'zeros':
+        elif self.initializer[0] == 0:
             dense_init = nn.initializers.zeros_init()
-
-        bias_init = nn.initializers.zeros_init()
+        
+        bias_init = nn.initializers.constant(self.initializer[1])
 
         # Ensure the input_sizes and time_sizes are correctly configured
         if self.input_sizes[-1] != 1:
@@ -43,6 +42,7 @@ class mlp(nn.Module):
             if self.time_sizes[0] != 1 or self.time_sizes[-1] != 1:
                 raise ValueError("Error in the sizes of time attention: should have same: (1) time_sizes[0] == 1 (2) time_sizes[-1] == 1")
             self.time_layers = [nn.Dense(o, kernel_init=dense_init, bias_init=bias_init) for o in self.time_sizes[1:]]
+            # self.time_att = 
         
         # Define Layers from input_sizes
         self.layers = [nn.Dense(o, kernel_init=dense_init, bias_init=bias_init) for o in self.input_sizes[1:]]
@@ -66,6 +66,9 @@ class mlp(nn.Module):
             for layer in self.time_layers[:-1]:
                 t_vals_reshaped = self.nonlinearity_fn(layer(t_vals_reshaped))
             att_params = self.nonlinearity_fn(self.time_layers[-1](t_vals_reshaped))
+
+            
+            # att_params = 
             att_params = att_params.reshape(x.shape[0], -1)
 
             # Filter the values of u based on these parameters

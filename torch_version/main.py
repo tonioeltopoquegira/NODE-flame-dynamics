@@ -45,7 +45,7 @@ if os.path.exists(f"weights/{path}/weights.pth") and not retrain:
 
     # We could learn using easy integrator then plug our derivative in better one and use a interpolator (no need to backpropagate through it)
 
-train_model(train_dataset, model, 1, model_name = model_name, path=path, batch_size=3000, scheduler=False, learning_rate=0.001, print_every=1)
+train_model(train_dataset, model, 200, model_name = model_name, path=path, batch_size=600, scheduler=False, learning_rate=0.001, print_every=1)
 """
 # Update Model
 model = update_weights(model, path)

@@ -23,7 +23,7 @@ def init_params(model, run, dataset, path):
     if run['model'] == 'node':
         shape_times = dataset[0].shape[1:]
         shape_iv = dataset[3].shape[1:]
-        params = model.init(rng, jnp.linspace(0, len(shape_times)), jnp.ones(shape_input), jnp.ones(shape_iv))['params']
+        params = model.init(rng, jnp.arange(0, shape_times[0], 1, dtype=jnp.float32), jnp.ones(shape_input), jnp.ones(shape_iv))['params']
     else:
         
         dummy_batch_size = (10000,)

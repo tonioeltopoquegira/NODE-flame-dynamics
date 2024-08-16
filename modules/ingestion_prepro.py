@@ -8,6 +8,17 @@ from models.node_utils.interpolator import Interpolator1D
 
 def ingestion_preprocess(run):
 
+    """ Preprocess the data before training for the Neural ODE model. 
+
+    Returns:
+       train_dataset (list of jnp.arrays) -> training dataset including time points, time points at which we interpolate 
+                                            for u to approximate the derivative, output, initial values 
+       test_data (list of jnp.array) -> testing dataset including time points, time points at which we interpolate 
+                                            for u to approximate the derivative, output, initial values 
+       input_size (int) -> number of evaluations of u(t) to feed in the neural net to approximate derivative
+       interpol (nn.module) -> Interpolator to evaluate u(t) from any instance of t
+    """
+
     amplitudes= run['amplitudes']
     seq_size=run['seq_size']
     train_percentage=run['train_percentage']
@@ -38,11 +49,10 @@ def ingestion_preprocess(run):
         output_data = output_data[timeHistorySizeOfU-1:] # FOR SOME REASON #TODO
 
         # Reshape the data using sliding window view
-        input_data = np.lib.stride_tricks.sliding_window_view(input_data, timeHistorySizeOfU)
-        time_data = np.lib.stride_tricks.sliding_window_view(time_data, timeHistorySizeOfU)
+        input_data = np.lib.stride_tricks.sliding_window_view(time_data, timeHistorySizeOfU)
         
         input_data = input_data[:,::downsampling_inputs]
-        time_data = time_data[:,::downsampling_inputs]
+        #time_data = time_data[:,::downsampling_inputs]
         
         # Split big unique sequences into smaller sequences (trajectories) of size seq_size
         num_sequences = len(input_data) // seq_size
@@ -69,13 +79,12 @@ def ingestion_preprocess(run):
     time_data = np.stack(time_data_list)
 
     # Convert to torch tensors
-    input_data = np.stack((time_data, input_data)).swapaxes(0, 1)
-    time_data= time_data[:, :, 0]
+    # input_data = np.stack((time_data, input_data)).swapaxes(0, 1)
 
     # Adjust inputs and times
-    last_element = input_data[:, 0, :, -1]
+    last_element = input_data[:, :, -1]
     last_element = last_element[:, :, np.newaxis]
-    input_data[:, 0, :, :] = - (input_data[:, 0, :, :] - last_element)
+    input_data[:, :, :] = - (input_data[:, :, :] - last_element)
     #input_data = input_data[:, 0, :, :] # only time steps to evaluate function!
 
     # Create Initial Values tensor  

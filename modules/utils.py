@@ -204,13 +204,7 @@ def random_split(*arrays, split_ratio=0.8, seed=None):
         if array.shape[0] != num_samples:
             raise ValueError("All arrays must have the same shape along the first dimension.")
 
-    indices = np.arange(num_samples)
-    # Set seed for reproducibility
-    if seed is not None:
-        np.random.seed(seed)
-    
-    # Shuffle indices
-    np.random.shuffle(indices)
+    indices = jnp.arange(num_samples)
     
     # Split indices
     split_index = int(num_samples * split_ratio)
@@ -226,7 +220,8 @@ def random_split(*arrays, split_ratio=0.8, seed=None):
 
 # TRAINING
 
-def data_loader(*arrays, batch_size):
+def data_loader(*arrays, batch_size): # ONLY FOR MOMENT ADJUSTED 
+
     """
     A simple data loader for batching data arrays.
 
@@ -251,20 +246,37 @@ def data_loader(*arrays, batch_size):
         batch_indices = indices[start_idx:start_idx + batch_size]
         yield tuple(array[batch_indices] for array in arrays)
 
-def train_plot_pred(times, targets, pred, path, epoch):
-    sorted_indices = jnp.argsort(times)
-    times = times[sorted_indices]
-    targets = targets[sorted_indices]
-    pred = pred[sorted_indices]
-
+def train_plot_pred(run, times, targets, pred, path, epoch):
     os.makedirs(f"figures/{path}/training_process", exist_ok=True)
-    plt.figure(figsize=(16, 8))
-    plt.plot(times[200:], targets[200:], label='Ground Truth', linestyle='--', color='k')
-    plt.plot(times[200:], pred[200:], label='Prediction', linestyle='-', color='r')
-    plt.title(f"Prediction at epoch {epoch}")
-    plt.legend()
-    plt.savefig(f"figures/{path}/training_process/{epoch}.png")
-    plt.close()
+
+    if run['model'] != 'node':
+        sorted_indices = jnp.argsort(times)
+        times = times[sorted_indices]
+        targets = targets[sorted_indices]
+        pred = pred[sorted_indices]
+
+        plt.figure(figsize=(16, 8))
+        plt.plot(times[:200], targets[:200], label='Ground Truth', linestyle='--', color='k')
+        plt.plot(times[:200], pred[:200], label='Prediction', linestyle='-', color='r')
+        plt.title(f"Prediction at epoch {epoch}")
+        plt.legend()
+        plt.savefig(f"figures/{path}/training_evolution/{epoch}.png")
+        plt.close()
+    
+    else:
+
+        os.makedirs(f"figures/{path}/training_process", exist_ok=True)
+        plt.figure(figsize=(16, 8))
+        plt.plot(times, targets, label='Ground Truth', linestyle='--', color='k')
+        plt.plot(times, pred, label='Prediction', linestyle='-', color='r')
+        plt.title(f"Prediction at epoch {epoch}")
+        plt.legend()
+        plt.savefig(f"figures/{path}/training_evolution/{epoch}.png")
+        plt.close()
+
+    
+
+    
 
 def mse_loss(pred, target):
     return jnp.mean((pred - target) ** 2)
@@ -302,50 +314,3 @@ def choose_nonlinearity(name):
         raise ValueError("Nonlinearity not recognized")
     return nl
 
-# Params Bookeeping
-
-def init_updt_state(dataset, run, model, path, tx):
-
-    # Create Checkpoint Manager
-    checkpointer = ocp.PyTreeCheckpointer()
-    options = ocp.CheckpointManagerOptions(max_to_keep=1, create=True)
-    save_path = os.path.abspath(f"weights/{path}") 
-
-
-    if os.path.exists(f"weights/{path}") and not run['retrain']:
-
-        # Update the weights
-        print("Loading existing weights...")
-
-        # Create a Manager
-        mngr = ocp.CheckpointManager(save_path, checkpointer, options)
-        restored_ckpt = mngr.restore(mngr.latest_step())
-        params = restored_ckpt["state"]["params"]
-        
-        # Restore a train state object
-        state = train_state.TrainState.create(
-            apply_fn=model.apply,
-            params=params,
-            tx=tx
-        )
-    
-    else:
-        # Initialize the RNG and model parameters
-        shape_input = dataset[1].shape[1:]
-        dummy_batch_size = (10000,)
-        shape_input = dummy_batch_size + shape_input
-        rng = random.PRNGKey(0)
-        params = model.init(rng, jnp.ones(shape_input))['params']
-
-        # Delete the previous stuff
-        if os.path.exists(save_path):
-            shutil.rmtree(save_path)
-        os.makedirs(save_path, exist_ok=True)
-
-        # Create Manager
-        mngr = ocp.CheckpointManager(save_path, checkpointer, options)
-
-        # Create a train state object
-        state = train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx)
-    
-    return state, mngr, params

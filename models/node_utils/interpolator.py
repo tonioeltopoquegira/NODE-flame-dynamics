@@ -24,10 +24,14 @@ class Interpolator1D(nn.Module):
     def _linear_interpolate(self, t_evaluation):
         idx = jnp.searchsorted(self.times, t_evaluation) - 1
         idx = jnp.clip(idx, 0, len(self.times) - 2)
-        x0 = self.times[idx]
-        x1 = self.times[idx + 1]
-        y0 = self.values[idx]
-        y1 = self.values[idx + 1]
+        
+        # Gather the values for the necessary indices
+        x0 = jnp.take(self.times, idx)
+        x1 = jnp.take(self.times, idx + 1)
+        y0 = jnp.take(self.values, idx)
+        y1 = jnp.take(self.values, idx + 1)
+
+        # Calculate the linear interpolation for the batch
         return y0 + (y1 - y0) * (t_evaluation - x0) / (x1 - x0)
     
     def _polynomial_interpolate(self, t_evaluation, deg):

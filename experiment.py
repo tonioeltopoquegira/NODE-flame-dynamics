@@ -11,8 +11,6 @@ from flax.training import orbax_utils
 
 # Functions
 from modules.train import train_model
-from modules.ingestion_prepro import ingestion_preprocess as ingestion_preprocess_node
-from modules.ingestion_prepro_other import ingestion_preprocess as ingestion_preprocess_other
 from modules.valid import validate
 from modules.utils import set_up_folders, record_run_from_file
 from modules.bookeeping_params import init_params, restore_params
@@ -29,9 +27,11 @@ def run_experiment(run):
 
     if run['model'] in ['node', 'gru']:
 
-        train_dataset, test_dataset, input_size, interpol = ingestion_preprocess_node(run)
+        from modules.ingestion_prepro import ingestion_preprocess
     else:
-        train_dataset, test_dataset, input_size = ingestion_preprocess_other(run)
+        from modules.ingestion_prepro_other import ingestion_preprocess 
+    
+    train_dataset, test_dataset, input_size, interpol = ingestion_preprocess(run)
 
     if run['model'] == 'node':
 
@@ -56,7 +56,7 @@ def run_experiment(run):
     # Train from starting of params
     mngr = train_model(train_dataset, params, model, run, path, mngr)
 
-
+    
     # Validation
     restored_ckpt = mngr.restore(mngr.latest_step())
     restored_params = restored_ckpt["state"]["params"]
@@ -72,13 +72,13 @@ if __name__ == '__main__':
     # Dictionaries and other stuff
     'save_dict': False,
     'dict': 'runs_report.xlsx',
-    'from_scratch' : True,
+    'from_scratch' : False,
     'show_res': True,
-    'seed':42,
+    'seed':45,
 
     # Data preprocessing
     'amplitudes': ['050'], 
-    'seq_size': 10, # (*)
+    'seq_size': 1000, # (*)
     'train_percentage': 0.9,
     'input_downsample_factor': 3,
     'downsampling_strat': 'uniform',
@@ -91,15 +91,15 @@ if __name__ == '__main__':
     'integ_method': 'euler', # ['euler', 'rk4']   (*)
     'deriv_model': 'mlp', # [ 'mlp' ]   (*)
     'hidd_sizes': [1],
-    'nonlinearity': 'relu', # ['tanh', 'relu', 'sigmoid', 'softplus', 'elu', 'selu', 'swish']
+    'nonlinearity': 'tanh', # ['tanh', 'relu', 'sigmoid', 'softplus', 'elu', 'selu', 'swish']
     'time-dep':'none', # ['time-att', 'time-branch']
     'time_hidd_sizes': [1,3,1],
-    'initializer': 'xavier',
+    'initializer': [1, 0.0], # 1 -> Xavier, 2 -> Normal
 
     # Training
-    'epochs': 1,
+    'epochs': 400,
     'batch_size': 600, # (**)
-    'learning_rate': 0.003,
+    'learning_rate': 0.001,
     'opt' : 'adam'
 }
 

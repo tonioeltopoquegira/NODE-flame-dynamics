@@ -17,7 +17,7 @@ from modules.utils import data_loader, train_plot_pred, mse_loss, mae_loss
 DEVICE = jax.devices("gpu" if jax.lib.xla_bridge.get_backend().platform == "gpu" else "cpu")[0]
 
 
-def train_model(dataset, params, model, run, path, mngr): 
+def train_model(dataset, init_params, model, run, path, mngr): 
     
     epochs = run['epochs']
     batch_size=run['batch_size']
@@ -32,9 +32,13 @@ def train_model(dataset, params, model, run, path, mngr):
     elif run['opt'] == 'sgd':
         tx = optax.sgd(learning_rate=learning_rate)
 
-
+    
     # Create a train state object
-    state = train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx)
+
+    state = train_state.TrainState.create(
+        apply_fn=model.apply,
+        params=init_params,
+        tx=tx)
 
     loss_train = np.zeros(epochs)
 
@@ -50,35 +54,46 @@ def train_model(dataset, params, model, run, path, mngr):
             
             if run['model'] == 'node':
                 times, inputs, targets, ivs = batch
+                times = times.squeeze(0)
+                inputs = inputs.squeeze(0)
+                ivs = ivs.squeeze(0)
+                targets = targets.squeeze(0)
+
                 def loss_fn(params):
                     t_eval, pred = model.apply({'params': params}, times, inputs, ivs)
                     loss = mse_loss(pred, targets)
                     return loss, pred
                 
             else:
+
                 times, inputs, targets = batch
+
                 def loss_fn(params):
                     pred = model.apply({'params': params}, inputs)
-                    loss = mse_loss(pred, targets)
+                    pred = pred.squeeze(-1) # Errore maledetto 
+                    residuals = pred - targets
+                    loss = jnp.mean((residuals) ** 2)
                     return loss, pred
-
 
             # Backpropagation
             grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
             (loss, preds) , grads = grad_fn(state.params)
             state = state.apply_gradients(grads=grads)
 
-            epoch_loss += loss.item()
+            epoch_loss += loss
 
         epoch_end_time = time.time()
         epoch_time = epoch_end_time - epoch_start_time
 
+        if (epoch+1)% 25 == 0:
+                train_plot_pred(run, times, targets, preds, path, epoch)
+                ckpt = {'state' : state}
+                mngr.save(epoch, ckpt)
+
+
         # Print epoch statistics
         if (epoch + 1) % print_every == 0:
             print(f"Epoch {epoch+1}, Epoch Total MSE: {(epoch_loss):.3f}, Epoch Time: {epoch_time:.2f}s")
-        
-        if (epoch+1)% 50 == 0:
-            train_plot_pred(times, targets, preds, path, epoch)
         
         loss_train[epoch] = epoch_loss
 
